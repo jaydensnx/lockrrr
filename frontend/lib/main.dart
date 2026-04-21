@@ -14,13 +14,123 @@ class DeliveryBoxApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: Colors.blue,
       ),
-      home: const AppShell(),
+      home: const AuthGate(),
     );
   }
 }
 
+/* ---------------- AUTH GATE ---------------- */
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool loggedIn = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return loggedIn
+        ? AppShell(
+            onLogout: () {
+              setState(() => loggedIn = false);
+            },
+          )
+        : LoginScreen(
+            onLoginSuccess: () {
+              setState(() => loggedIn = true);
+            },
+          );
+  }
+}
+
+/* ---------------- LOGIN SCREEN ---------------- */
+
+class LoginScreen extends StatefulWidget {
+  final VoidCallback onLoginSuccess;
+  const LoginScreen({super.key, required this.onLoginSuccess});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final userController = TextEditingController();
+  final passController = TextEditingController();
+  String? error;
+
+  void signIn() {
+    const username = "prototype";
+    const password = "box1demo";
+
+    if (userController.text == username &&
+        passController.text == password) {
+      widget.onLoginSuccess();
+    } else {
+      setState(() {
+        error = "Invalid login";
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: SizedBox(
+          width: 320,
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Sign in to Box 1",
+                    style:
+                        TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: userController,
+                    decoration: const InputDecoration(labelText: "Username"),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passController,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: "Password"),
+                  ),
+                  const SizedBox(height: 16),
+                  if (error != null)
+                    Text(error!, style: const TextStyle(color: Colors.red)),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: signIn,
+                      child: const Text("Sign In"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/* ---------------- APP SHELL ---------------- */
+
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  final VoidCallback onLogout;
+
+  const AppShell({super.key, required this.onLogout});
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -53,8 +163,8 @@ class _AppShellState extends State<AppShell> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {},
+            icon: const Icon(Icons.logout),
+            onPressed: widget.onLogout,
           )
         ],
       ),
@@ -83,7 +193,7 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-/* ---------------- Dashboard ---------------- */
+/* ---------------- DASHBOARD ---------------- */
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -96,23 +206,20 @@ class DashboardScreen extends StatelessWidget {
         const Text("Items in Box",
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-
         Card(
           child: ListTile(
-            leading: const Icon(Icons.inventory_2, size: 36, color: Colors.amber),
+            leading:
+                const Icon(Icons.inventory_2, size: 36, color: Colors.amber),
             title: const Text("Item in Box",
                 style: TextStyle(fontWeight: FontWeight.w600)),
             subtitle: const Text("Now"),
             trailing: const Icon(Icons.chevron_right),
           ),
         ),
-
         const SizedBox(height: 24),
-
         const Text("Recent Motion Detected",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-
         motionTile("Motion Detected", "Today • 2:41 PM", true),
         motionTile("Package Delivered", "Today • 1:12 PM", false),
         motionTile("Motion Detected", "Today • 10:05 AM", true),
@@ -134,7 +241,7 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-/* ---------------- Lock Screen ---------------- */
+/* ---------------- LOCK ---------------- */
 
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
