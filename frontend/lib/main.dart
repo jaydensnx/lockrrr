@@ -78,8 +78,11 @@ class _AuthGateState extends State<AuthGate> {
 
 /* ---------------- LOGIN SCREEN ---------------- */
 
+<<<<<<< Updated upstream
 /* ---------------- LOGIN SCREEN ---------------- */
 
+=======
+>>>>>>> Stashed changes
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
   const LoginScreen({super.key, required this.onLoginSuccess});
@@ -112,13 +115,17 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
+<<<<<<< Updated upstream
           // 🔹 BACKGROUND IMAGE
+=======
+>>>>>>> Stashed changes
           SizedBox.expand(
             child: Image.asset(
               'assets/trackingmap.png',
               fit: BoxFit.cover,
             ),
           ),
+<<<<<<< Updated upstream
 
           // 🔹 OPTIONAL DARK OVERLAY (makes UI easier to see)
           Container(
@@ -126,6 +133,11 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
 
           // 🔹 CENTER WHITE LOGIN BOX
+=======
+          Container(
+            color: Colors.black.withOpacity(0.3),
+          ),
+>>>>>>> Stashed changes
           Center(
             child: SizedBox(
               width: 320,
@@ -147,7 +159,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Text(
                         "Sign in to Box 1",
                         style: TextStyle(
+<<<<<<< Updated upstream
                             fontSize: 22, fontWeight: FontWeight.bold),
+=======
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+>>>>>>> Stashed changes
                       ),
                       const SizedBox(height: 16),
                       TextField(
@@ -164,8 +182,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 16),
                       if (error != null)
+<<<<<<< Updated upstream
                         Text(error!,
                             style: const TextStyle(color: Colors.red)),
+=======
+                        Text(
+                          error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+>>>>>>> Stashed changes
                       const SizedBox(height: 8),
                       SizedBox(
                         width: double.infinity,
@@ -186,6 +211,21 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+<<<<<<< Updated upstream
+=======
+/* ---------------- DATA MODEL ---------------- */
+
+class UnlockNotification {
+  final String title;
+  final DateTime timestamp;
+
+  UnlockNotification({
+    required this.title,
+    required this.timestamp,
+  });
+}
+
+>>>>>>> Stashed changes
 /* ---------------- APP SHELL ---------------- */
 
 class AppShell extends StatefulWidget {
@@ -200,10 +240,23 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int index = 0;
 
-  final screens = const [
-    DashboardScreen(),
-    LockScreen(),
-  ];
+  final List<UnlockNotification> notifications = [];
+
+  void addUnlockNotification() {
+    setState(() {
+      notifications.insert(
+        0,
+        UnlockNotification(
+          title: "Box Unlocked",
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      if (notifications.length > 4) {
+        notifications.removeLast();
+      }
+    });
+  }
 
   void goTo(int i) {
     setState(() => index = i);
@@ -212,6 +265,11 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      DashboardScreen(notifications: notifications),
+      LockScreen(onUnlocked: addUnlockNotification),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 120,
@@ -242,8 +300,10 @@ class _AppShellState extends State<AppShell> {
         child: ListView(
           children: [
             const DrawerHeader(
-              child: Text("Delivery Box",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              child: Text(
+                "Delivery Box",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.inbox),
@@ -266,7 +326,18 @@ class _AppShellState extends State<AppShell> {
 /* ---------------- DASHBOARD ---------------- */
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  final List<UnlockNotification> notifications;
+
+  const DashboardScreen({
+    super.key,
+    required this.notifications,
+  });
+
+  bool _isDelivered(String? status) {
+    if (status == null) return false;
+    final s = status.toLowerCase();
+    return s.contains('delivered');
+  }
 
   bool _isDelivered(String? status) {
     if (status == null) return false;
@@ -279,25 +350,40 @@ class DashboardScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text("Items in Box",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const Text(
+          "Items in Box",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
         Card(
           child: ListTile(
             leading:
                 const Icon(Icons.inventory_2, size: 36, color: Colors.amber),
+<<<<<<< Updated upstream
             title: const Text("Item in Box",
                 style: TextStyle(fontWeight: FontWeight.w600)),
+=======
+            title: const Text(
+              "Item in Box",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+>>>>>>> Stashed changes
             subtitle: const Text("Now"),
             trailing: const Icon(Icons.chevron_right),
           ),
         ),
         const SizedBox(height: 24),
+<<<<<<< Updated upstream
 
         const Text("Package Tracking",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+=======
+        const Text(
+          "Package Tracking",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+>>>>>>> Stashed changes
         const SizedBox(height: 12),
-
         FutureBuilder<Map<String, dynamic>>(
           future: TrackingApi.fetchTracking(),
           builder: (context, snapshot) {
@@ -314,6 +400,25 @@ class DashboardScreen extends StatelessWidget {
               );
             }
 
+<<<<<<< Updated upstream
+        FutureBuilder<Map<String, dynamic>>(
+          future: TrackingApi.fetchTracking(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Card(
+                child: ListTile(
+                  leading: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  title: Text("Loading tracking info..."),
+                ),
+              );
+            }
+
+=======
+>>>>>>> Stashed changes
             if (snapshot.hasError) {
               return Card(
                 child: ListTile(
@@ -371,6 +476,7 @@ class DashboardScreen extends StatelessWidget {
             );
           },
         ),
+<<<<<<< Updated upstream
 
         const SizedBox(height: 24),
         const Text("Recent Motion Detected",
@@ -380,27 +486,82 @@ class DashboardScreen extends StatelessWidget {
         motionTile("Package Delivered", "Today • 1:12 PM", false),
         motionTile("Motion Detected", "Today • 10:05 AM", true),
         motionTile("Motion Detected", "Yesterday • 5:32 PM", true),
+=======
+        const SizedBox(height: 24),
+        const Text(
+          "Notifications",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        if (notifications.isEmpty)
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.notifications_none),
+              title: Text("No notifications yet"),
+              subtitle: Text("Unlock the box to see notifications here."),
+            ),
+          )
+        else
+          ...notifications.map(
+            (note) => Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.notifications_active,
+                  color: Colors.blue,
+                ),
+                title: Text(
+                  note.title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(formatDateTime(note.timestamp)),
+                trailing: const Icon(Icons.lock_open, color: Colors.green),
+              ),
+            ),
+          ),
+>>>>>>> Stashed changes
       ],
     );
   }
 
-  static Widget motionTile(String title, String time, bool isMotion) {
-    return Card(
-      child: ListTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(time),
-        trailing: isMotion
-            ? const Icon(Icons.circle, color: Colors.red, size: 10)
-            : const Icon(Icons.check_circle, color: Colors.green),
-      ),
-    );
+  static String formatDateTime(DateTime dateTime) {
+    final hour = dateTime.hour > 12
+        ? dateTime.hour - 12
+        : (dateTime.hour == 0 ? 12 : dateTime.hour);
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final period = dateTime.hour >= 12 ? 'PM' : 'AM';
+
+    final month = _monthName(dateTime.month);
+    return "$month ${dateTime.day}, ${dateTime.year} • $hour:$minute $period";
+  }
+
+  static String _monthName(int month) {
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    return months[month - 1];
   }
 }
 
 /* ---------------- LOCK ---------------- */
 
 class LockScreen extends StatefulWidget {
-  const LockScreen({super.key});
+  final VoidCallback onUnlocked;
+
+  const LockScreen({
+    super.key,
+    required this.onUnlocked,
+  });
 
   @override
   State<LockScreen> createState() => _LockScreenState();
@@ -408,6 +569,17 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   bool locked = true;
+
+  void toggleLock() {
+    setState(() {
+      if (locked) {
+        locked = false;
+        widget.onUnlocked();
+      } else {
+        locked = true;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -428,15 +600,15 @@ class _LockScreenState extends State<LockScreen> {
               Text(
                 locked ? "Locked" : "Unlocked",
                 style: const TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.bold),
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    setState(() => locked = !locked);
-                  },
+                  onPressed: toggleLock,
                   child: Text(locked ? "Unlock" : "Lock"),
                 ),
               )

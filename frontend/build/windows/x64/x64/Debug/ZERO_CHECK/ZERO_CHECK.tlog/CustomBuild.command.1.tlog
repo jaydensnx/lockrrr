@@ -1,0 +1,10 @@
+^C:\USERS\CARTE\ONEDRIVE\DOCUMENTS\GITHUB\LOCKRRR\FRONTEND\BUILD\WINDOWS\X64\CMAKEFILES\FD136D6CAD47323484F2D0E668956D6A\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/carte/OneDrive/Documents/GitHub/lockrrr/frontend/windows -BC:/Users/carte/OneDrive/Documents/GitHub/lockrrr/frontend/build/windows/x64 --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/carte/OneDrive/Documents/GitHub/lockrrr/frontend/build/windows/x64/lockrrr.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
