@@ -88,6 +88,11 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Image.asset(
+                    'assets/logo.png',
+                    height: 100,
+                  ),
+                  const SizedBox(height: 12),
                   const Text(
                     "Sign in to Box 1",
                     style:
@@ -152,22 +157,31 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Delivery Box", style: TextStyle(fontWeight: FontWeight.w600)),
-            SizedBox(height: 2),
-            Text("Front Porch • Box #1", style: TextStyle(fontSize: 12)),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: widget.onLogout,
-          )
+    appBar: AppBar(
+      toolbarHeight: 120,
+      centerTitle: true,
+      title: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            'assets/logo.png',
+            height: 70,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Front Porch • Box #1",
+            style: TextStyle(fontSize: 12),
+          ),
         ],
       ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout),
+          onPressed: widget.onLogout,
+        )
+      ],
+    ),
       drawer: Drawer(
         child: ListView(
           children: [
