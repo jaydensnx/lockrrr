@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 void main() => runApp(const DeliveryBoxApp());
 
@@ -16,6 +18,33 @@ class DeliveryBoxApp extends StatelessWidget {
       ),
       home: const AuthGate(),
     );
+  }
+}
+
+class TrackingApi {
+  static const String trackingNumber = '1Z999AA10123456784';
+
+  // Change this depending on what you're running on:
+  // Android emulator -> http://10.0.2.2:8080
+  // iOS simulator -> http://localhost:8080
+  // Real phone -> http://YOUR_COMPUTER_IP:8080
+  static const String baseUrl = 'http://10.0.2.2:8080';
+
+  static Future<Map<String, dynamic>> fetchTracking() async {
+    final uri = Uri.parse('$baseUrl/api/track/$trackingNumber');
+    final response = await http.get(uri);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to load tracking: ${response.statusCode}');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (decoded['ok'] != true) {
+      throw Exception(decoded['error']?.toString() ?? 'Unknown tracking error');
+    }
+
+    return (decoded['data'] as Map<String, dynamic>? ?? {});
   }
 }
 
@@ -49,6 +78,8 @@ class _AuthGateState extends State<AuthGate> {
 
 /* ---------------- LOGIN SCREEN ---------------- */
 
+/* ---------------- LOGIN SCREEN ---------------- */
+
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
   const LoginScreen({super.key, required this.onLoginSuccess});
@@ -79,52 +110,77 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SizedBox(
-          width: 320,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    'assets/logo.png',
-                    height: 100,
+      body: Stack(
+        children: [
+          // 🔹 BACKGROUND IMAGE
+          SizedBox.expand(
+            child: Image.asset(
+              'assets/trackingmap.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+
+          // 🔹 OPTIONAL DARK OVERLAY (makes UI easier to see)
+          Container(
+            color: Colors.black.withOpacity(0.3),
+          ),
+
+          // 🔹 CENTER WHITE LOGIN BOX
+          Center(
+            child: SizedBox(
+              width: 320,
+              child: Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/logo.png',
+                        height: 80,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        "Sign in to Box 1",
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: userController,
+                        decoration:
+                            const InputDecoration(labelText: "Username"),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: passController,
+                        obscureText: true,
+                        decoration:
+                            const InputDecoration(labelText: "Password"),
+                      ),
+                      const SizedBox(height: 16),
+                      if (error != null)
+                        Text(error!,
+                            style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: signIn,
+                          child: const Text("Sign In"),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    "Sign in to Box 1",
-                    style:
-                        TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: userController,
-                    decoration: const InputDecoration(labelText: "Username"),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: passController,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: "Password"),
-                  ),
-                  const SizedBox(height: 16),
-                  if (error != null)
-                    Text(error!, style: const TextStyle(color: Colors.red)),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: signIn,
-                      child: const Text("Sign In"),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -157,31 +213,31 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-    appBar: AppBar(
-      toolbarHeight: 120,
-      centerTitle: true,
-      title: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/logo.png',
-            height: 70,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            "Front Porch • Box #1",
-            style: TextStyle(fontSize: 12),
-          ),
+      appBar: AppBar(
+        toolbarHeight: 120,
+        centerTitle: true,
+        title: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/logo.png',
+              height: 70,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              "Front Porch • Box #1",
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: widget.onLogout,
+          )
         ],
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout),
-          onPressed: widget.onLogout,
-        )
-      ],
-    ),
       drawer: Drawer(
         child: ListView(
           children: [
@@ -212,6 +268,12 @@ class _AppShellState extends State<AppShell> {
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
+  bool _isDelivered(String? status) {
+    if (status == null) return false;
+    final s = status.toLowerCase();
+    return s.contains('delivered');
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -230,6 +292,86 @@ class DashboardScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
           ),
         ),
+        const SizedBox(height: 24),
+
+        const Text("Package Tracking",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+
+        FutureBuilder<Map<String, dynamic>>(
+          future: TrackingApi.fetchTracking(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Card(
+                child: ListTile(
+                  leading: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  title: Text("Loading tracking info..."),
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.error, color: Colors.red),
+                  title: const Text(
+                    "Could not load tracking",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(snapshot.error.toString()),
+                ),
+              );
+            }
+
+            final tracking = snapshot.data ?? {};
+            final status = tracking['status']?.toString() ?? 'Unknown';
+            final location = tracking['latestLocation']?.toString();
+            final deliveryDate = tracking['deliveryDate']?.toString();
+            final description = tracking['latestDescription']?.toString();
+            final delivered = _isDelivered(status);
+
+            return Column(
+              children: [
+                Card(
+                  child: ListTile(
+                    leading: Icon(
+                      delivered ? Icons.check_circle : Icons.local_shipping,
+                      color: delivered ? Colors.green : Colors.blue,
+                      size: 32,
+                    ),
+                    title: Text(
+                      status,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      location ?? description ?? 'No location available',
+                    ),
+                    trailing: Icon(
+                      delivered ? Icons.done_all : Icons.schedule,
+                      color: delivered ? Colors.green : Colors.orange,
+                    ),
+                  ),
+                ),
+                if (deliveryDate != null && deliveryDate.isNotEmpty)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.calendar_today),
+                      title: const Text(
+                        "Delivery Date",
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(deliveryDate),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+
         const SizedBox(height: 24),
         const Text("Recent Motion Detected",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
