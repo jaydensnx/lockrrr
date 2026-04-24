@@ -314,26 +314,8 @@ class DashboardScreen extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         const Text(
-          "Items in Box",
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: ListTile(
-            leading:
-                const Icon(Icons.inventory_2, size: 36, color: Colors.amber),
-            title: const Text(
-              "Item in Box",
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: const Text("Now"),
-            trailing: const Icon(Icons.chevron_right),
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
           "Package Tracking",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
         FutureBuilder<Map<String, dynamic>>(
