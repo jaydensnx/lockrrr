@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 
 void main() => runApp(const DeliveryBoxApp());
@@ -472,16 +473,35 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   bool locked = true;
+  Timer? relockTimer; //
 
   void toggleLock() {
-    setState(() {
-      if (locked) {
+    if (locked) {
+      // Unlock action
+      setState(() {
         locked = false;
-        widget.onUnlocked();
-      } else {
-        locked = true;
-      }
-    });
+      });
+
+      widget.onUnlocked();
+
+      // Cancel any existing timer just in case
+      relockTimer?.cancel();
+
+      // Start 10 second auto-lock timer
+      relockTimer = Timer(const Duration(seconds: 10), () {
+        if (mounted) {
+          setState(() {
+            locked = true;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    relockTimer?.cancel(); // 👈 CLEANUP
+    super.dispose();
   }
 
   @override
@@ -511,8 +531,8 @@ class _LockScreenState extends State<LockScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: toggleLock,
-                  child: Text(locked ? "Unlock" : "Lock"),
+                  onPressed: locked ? toggleLock : null, // 👈 disables button when unlocked
+                  child: Text(locked ? "Unlock" : "Waiting..."),
                 ),
               )
             ],
