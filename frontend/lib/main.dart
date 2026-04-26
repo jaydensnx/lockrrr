@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 
 void main() => runApp(const DeliveryBoxApp());
@@ -78,8 +79,6 @@ class _AuthGateState extends State<AuthGate> {
 
 /* ---------------- LOGIN SCREEN ---------------- */
 
-/* ---------------- LOGIN SCREEN ---------------- */
-
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
   const LoginScreen({super.key, required this.onLoginSuccess});
@@ -112,20 +111,15 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // 🔹 BACKGROUND IMAGE
           SizedBox.expand(
             child: Image.asset(
               'assets/trackingmap.png',
               fit: BoxFit.cover,
             ),
           ),
-
-          // 🔹 OPTIONAL DARK OVERLAY (makes UI easier to see)
           Container(
             color: Colors.black.withOpacity(0.3),
           ),
-
-          // 🔹 CENTER WHITE LOGIN BOX
           Center(
             child: SizedBox(
               width: 320,
@@ -147,7 +141,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Text(
                         "Sign in to Box 1",
                         style: TextStyle(
-                            fontSize: 22, fontWeight: FontWeight.bold),
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextField(
@@ -164,8 +160,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 16),
                       if (error != null)
-                        Text(error!,
-                            style: const TextStyle(color: Colors.red)),
+                        Text(
+                          error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       const SizedBox(height: 8),
                       SizedBox(
                         width: double.infinity,
@@ -186,6 +184,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+/* ---------------- DATA MODEL ---------------- */
+
+class UnlockNotification {
+  final String title;
+  final DateTime timestamp;
+
+  UnlockNotification({
+    required this.title,
+    required this.timestamp,
+  });
+}
+
 /* ---------------- APP SHELL ---------------- */
 
 class AppShell extends StatefulWidget {
@@ -200,10 +210,23 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int index = 0;
 
-  final screens = const [
-    DashboardScreen(),
-    LockScreen(),
-  ];
+  final List<UnlockNotification> notifications = [];
+
+  void addUnlockNotification() {
+    setState(() {
+      notifications.insert(
+        0,
+        UnlockNotification(
+          title: "Box Unlocked",
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      if (notifications.length > 4) {
+        notifications.removeLast();
+      }
+    });
+  }
 
   void goTo(int i) {
     setState(() => index = i);
@@ -212,6 +235,11 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      DashboardScreen(notifications: notifications),
+      LockScreen(onUnlocked: addUnlockNotification),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 120,
@@ -242,8 +270,10 @@ class _AppShellState extends State<AppShell> {
         child: ListView(
           children: [
             const DrawerHeader(
-              child: Text("Delivery Box",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              child: Text(
+                "Delivery Box",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.inbox),
@@ -266,7 +296,12 @@ class _AppShellState extends State<AppShell> {
 /* ---------------- DASHBOARD ---------------- */
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  final List<UnlockNotification> notifications;
+
+  const DashboardScreen({
+    super.key,
+    required this.notifications,
+  });
 
   bool _isDelivered(String? status) {
     if (status == null) return false;
@@ -279,25 +314,11 @@ class DashboardScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text("Items in Box",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        Card(
-          child: ListTile(
-            leading:
-                const Icon(Icons.inventory_2, size: 36, color: Colors.amber),
-            title: const Text("Item in Box",
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text("Now"),
-            trailing: const Icon(Icons.chevron_right),
-          ),
+        const Text(
+          "Package Tracking",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 24),
-
-        const Text("Package Tracking",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-
         FutureBuilder<Map<String, dynamic>>(
           future: TrackingApi.fetchTracking(),
           builder: (context, snapshot) {
@@ -371,36 +392,80 @@ class DashboardScreen extends StatelessWidget {
             );
           },
         ),
-
         const SizedBox(height: 24),
-        const Text("Recent Motion Detected",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text(
+          "Notifications",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
-        motionTile("Motion Detected", "Today • 2:41 PM", true),
-        motionTile("Package Delivered", "Today • 1:12 PM", false),
-        motionTile("Motion Detected", "Today • 10:05 AM", true),
-        motionTile("Motion Detected", "Yesterday • 5:32 PM", true),
+        if (notifications.isEmpty)
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.notifications_none),
+              title: Text("No notifications yet"),
+              subtitle: Text("Unlock the box to see notifications here."),
+            ),
+          )
+        else
+          ...notifications.map(
+            (note) => Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.notifications_active,
+                  color: Colors.blue,
+                ),
+                title: Text(
+                  note.title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(formatDateTime(note.timestamp)),
+                trailing: const Icon(Icons.lock_open, color: Colors.green),
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  static Widget motionTile(String title, String time, bool isMotion) {
-    return Card(
-      child: ListTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(time),
-        trailing: isMotion
-            ? const Icon(Icons.circle, color: Colors.red, size: 10)
-            : const Icon(Icons.check_circle, color: Colors.green),
-      ),
-    );
+  static String formatDateTime(DateTime dateTime) {
+    final hour = dateTime.hour > 12
+        ? dateTime.hour - 12
+        : (dateTime.hour == 0 ? 12 : dateTime.hour);
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final period = dateTime.hour >= 12 ? 'PM' : 'AM';
+
+    final month = _monthName(dateTime.month);
+    return "$month ${dateTime.day}, ${dateTime.year} • $hour:$minute $period";
+  }
+
+  static String _monthName(int month) {
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    return months[month - 1];
   }
 }
 
 /* ---------------- LOCK ---------------- */
 
 class LockScreen extends StatefulWidget {
-  const LockScreen({super.key});
+  final VoidCallback onUnlocked;
+
+  const LockScreen({
+    super.key,
+    required this.onUnlocked,
+  });
 
   @override
   State<LockScreen> createState() => _LockScreenState();
@@ -408,6 +473,36 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   bool locked = true;
+  Timer? relockTimer; //
+
+  void toggleLock() {
+    if (locked) {
+      // Unlock action
+      setState(() {
+        locked = false;
+      });
+
+      widget.onUnlocked();
+
+      // Cancel any existing timer just in case
+      relockTimer?.cancel();
+
+      // Start 10 second auto-lock timer
+      relockTimer = Timer(const Duration(seconds: 10), () {
+        if (mounted) {
+          setState(() {
+            locked = true;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    relockTimer?.cancel(); // 👈 CLEANUP
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -428,16 +523,16 @@ class _LockScreenState extends State<LockScreen> {
               Text(
                 locked ? "Locked" : "Unlocked",
                 style: const TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.bold),
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    setState(() => locked = !locked);
-                  },
-                  child: Text(locked ? "Unlock" : "Lock"),
+                  onPressed: locked ? toggleLock : null, // 👈 disables button when unlocked
+                  child: Text(locked ? "Unlock" : "Waiting..."),
                 ),
               )
             ],

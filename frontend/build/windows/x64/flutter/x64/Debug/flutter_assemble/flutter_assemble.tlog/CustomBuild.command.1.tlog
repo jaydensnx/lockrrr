@@ -1,0 +1,28 @@
+^C:\USERS\CARTE\ONEDRIVE\DOCUMENTS\GITHUB\LOCKRRR\FRONTEND\BUILD\WINDOWS\X64\CMAKEFILES\F28455D5507EE05FD27194462E675147\FLUTTER_WINDOWS.DLL.RULE
+setlocal
+"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env "FLUTTER_ROOT=C:\Users\carte\OneDrive\Documents\Flutter SDK\flutter" PROJECT_DIR=C:\Users\carte\OneDrive\Documents\GitHub\lockrrr\frontend "FLUTTER_ROOT=C:\Users\carte\OneDrive\Documents\Flutter SDK\flutter" FLUTTER_EPHEMERAL_DIR=C:\Users\carte\OneDrive\Documents\GitHub\lockrrr\frontend\windows\flutter\ephemeral PROJECT_DIR=C:\Users\carte\OneDrive\Documents\GitHub\lockrrr\frontend FLUTTER_TARGET=C:\Users\carte\OneDrive\Documents\GitHub\lockrrr\frontend\lib\main.dart DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDEuNQ==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049MmM5ZWIyMDczOQ==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049MDUyZjMxZDExNQ==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMS4z DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=C:\Users\carte\OneDrive\Documents\GitHub\lockrrr\frontend\.dart_tool\package_config.json "C:/Users/carte/OneDrive/Documents/Flutter SDK/flutter/packages/flutter_tools/bin/tool_backend.bat" windows-x64 Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\CARTE\ONEDRIVE\DOCUMENTS\GITHUB\LOCKRRR\FRONTEND\BUILD\WINDOWS\X64\CMAKEFILES\B55EEE4ED1310CD678C1DBDBADF76269\FLUTTER_ASSEMBLE.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\CARTE\ONEDRIVE\DOCUMENTS\GITHUB\LOCKRRR\FRONTEND\WINDOWS\FLUTTER\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/carte/OneDrive/Documents/GitHub/lockrrr/frontend/windows -BC:/Users/carte/OneDrive/Documents/GitHub/lockrrr/frontend/build/windows/x64 --check-stamp-file C:/Users/carte/OneDrive/Documents/GitHub/lockrrr/frontend/build/windows/x64/flutter/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
