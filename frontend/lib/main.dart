@@ -1,6 +1,11 @@
-import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/material.dart';
+
+import 'ups_service.dart';
+import 'fedex_service.dart';
+import 'amazon_service.dart';
+
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 void main() => runApp(const DeliveryBoxApp());
@@ -19,33 +24,6 @@ class DeliveryBoxApp extends StatelessWidget {
       ),
       home: const AuthGate(),
     );
-  }
-}
-
-class TrackingApi {
-  static const String trackingNumber = '1Z999AA10123456784';
-
-  // Change this depending on what you're running on:
-  // Android emulator -> http://10.0.2.2:8080
-  // iOS simulator -> http://localhost:8080
-  // Real phone -> http://YOUR_COMPUTER_IP:8080
-  static const String baseUrl = 'http://10.0.2.2:8080';
-
-  static Future<Map<String, dynamic>> fetchTracking() async {
-    final uri = Uri.parse('$baseUrl/api/track/$trackingNumber');
-    final response = await http.get(uri);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Failed to load tracking: ${response.statusCode}');
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-
-    if (decoded['ok'] != true) {
-      throw Exception(decoded['error']?.toString() ?? 'Unknown tracking error');
-    }
-
-    return (decoded['data'] as Map<String, dynamic>? ?? {});
   }
 }
 
@@ -81,6 +59,7 @@ class _AuthGateState extends State<AuthGate> {
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
+
   const LoginScreen({super.key, required this.onLoginSuccess});
 
   @override
@@ -96,14 +75,20 @@ class _LoginScreenState extends State<LoginScreen> {
     const username = "prototype";
     const password = "box1demo";
 
-    if (userController.text == username &&
-        passController.text == password) {
+    if (userController.text == username && passController.text == password) {
       widget.onLoginSuccess();
     } else {
       setState(() {
         error = "Invalid login";
       });
     }
+  }
+
+  @override
+  void dispose() {
+    userController.dispose();
+    passController.dispose();
+    super.dispose();
   }
 
   @override
@@ -139,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        "Sign in to Box 1",
+                        "Sign in",
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -148,15 +133,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: userController,
-                        decoration:
-                            const InputDecoration(labelText: "Username"),
+                        decoration: const InputDecoration(
+                          labelText: "Username",
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: passController,
                         obscureText: true,
-                        decoration:
-                            const InputDecoration(labelText: "Password"),
+                        decoration: const InputDecoration(
+                          labelText: "Password",
+                        ),
                       ),
                       const SizedBox(height: 16),
                       if (error != null)
@@ -237,6 +224,7 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final screens = [
       DashboardScreen(notifications: notifications),
+      const TrackingScreen(),
       LockScreen(onUnlocked: addUnlockNotification),
     ];
 
@@ -263,7 +251,7 @@ class _AppShellState extends State<AppShell> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: widget.onLogout,
-          )
+          ),
         ],
       ),
       drawer: Drawer(
@@ -272,7 +260,10 @@ class _AppShellState extends State<AppShell> {
             const DrawerHeader(
               child: Text(
                 "Delivery Box",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             ListTile(
@@ -281,9 +272,14 @@ class _AppShellState extends State<AppShell> {
               onTap: () => goTo(0),
             ),
             ListTile(
+              leading: const Icon(Icons.local_shipping),
+              title: const Text("Tracking"),
+              onTap: () => goTo(1),
+            ),
+            ListTile(
               leading: const Icon(Icons.lock),
               title: const Text("Lock"),
-              onTap: () => goTo(1),
+              onTap: () => goTo(2),
             ),
           ],
         ),
@@ -303,94 +299,27 @@ class DashboardScreen extends StatelessWidget {
     required this.notifications,
   });
 
-  bool _isDelivered(String? status) {
-    if (status == null) return false;
-    final s = status.toLowerCase();
-    return s.contains('delivered');
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const Text(
-          "Package Tracking",
+          "Dashboard",
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        FutureBuilder<Map<String, dynamic>>(
-          future: TrackingApi.fetchTracking(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Card(
-                child: ListTile(
-                  leading: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  title: Text("Loading tracking info..."),
-                ),
-              );
-            }
-
-            if (snapshot.hasError) {
-              return Card(
-                child: ListTile(
-                  leading: const Icon(Icons.error, color: Colors.red),
-                  title: const Text(
-                    "Could not load tracking",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(snapshot.error.toString()),
-                ),
-              );
-            }
-
-            final tracking = snapshot.data ?? {};
-            final status = tracking['status']?.toString() ?? 'Unknown';
-            final location = tracking['latestLocation']?.toString();
-            final deliveryDate = tracking['deliveryDate']?.toString();
-            final description = tracking['latestDescription']?.toString();
-            final delivered = _isDelivered(status);
-
-            return Column(
-              children: [
-                Card(
-                  child: ListTile(
-                    leading: Icon(
-                      delivered ? Icons.check_circle : Icons.local_shipping,
-                      color: delivered ? Colors.green : Colors.blue,
-                      size: 32,
-                    ),
-                    title: Text(
-                      status,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      location ?? description ?? 'No location available',
-                    ),
-                    trailing: Icon(
-                      delivered ? Icons.done_all : Icons.schedule,
-                      color: delivered ? Colors.green : Colors.orange,
-                    ),
-                  ),
-                ),
-                if (deliveryDate != null && deliveryDate.isNotEmpty)
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.calendar_today),
-                      title: const Text(
-                        "Delivery Date",
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(deliveryDate),
-                    ),
-                  ),
-              ],
-            );
-          },
+        const Card(
+          child: ListTile(
+            leading: Icon(Icons.local_shipping, color: Colors.blue),
+            title: Text(
+              "Package Tracking",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              "Open the Tracking page from the menu to track UPS, FedEx, or Amazon packages.",
+            ),
+          ),
         ),
         const SizedBox(height: 24),
         const Text(
@@ -457,6 +386,298 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
+/* ---------------- TRACKING PAGE ---------------- */
+
+class TrackingScreen extends StatefulWidget {
+  const TrackingScreen({super.key});
+
+  @override
+  State<TrackingScreen> createState() => _TrackingScreenState();
+}
+
+class _TrackingScreenState extends State<TrackingScreen> {
+  final upsController = TextEditingController();
+  final fedexController = TextEditingController();
+  final amazonController = TextEditingController();
+
+  String? upsResult;
+  String? fedexResult;
+  String? amazonResult;
+
+  bool upsLoading = false;
+  bool fedexLoading = false;
+  bool amazonLoading = false;
+
+  final upsService = UpsService(
+    clientId: 'YOUR_UPS_CLIENT_ID',
+    clientSecret: 'YOUR_UPS_CLIENT_SECRET',
+    accountNumber: 'YOUR_UPS_ACCOUNT_NUMBER',
+    baseUrl: 'https://wwwcie.ups.com',
+  );
+
+  final fedexService = FedExService(
+    clientId: 'YOUR_FEDEX_CLIENT_ID',
+    clientSecret: 'YOUR_FEDEX_CLIENT_SECRET',
+    baseUrl: 'https://apis-sandbox.fedex.com',
+  );
+
+  final amazonService = AmazonService(
+    accessToken: 'YOUR_AMAZON_ACCESS_TOKEN',
+    baseUrl: 'YOUR_AMAZON_BASE_URL',
+  );
+
+  Future<void> trackUps() async {
+    final trackingNumber = upsController.text.trim();
+
+    if (trackingNumber.isEmpty) {
+      setState(() {
+        upsResult = "Please enter a UPS tracking number.";
+      });
+      return;
+    }
+
+    setState(() {
+      upsLoading = true;
+      upsResult = null;
+    });
+
+    try {
+      final res = await http.post(
+        Uri.parse('http://localhost:8080/api/tracking'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'carrier': 'ups',
+          'trackingNumber': trackingNumber,
+        }),
+      );
+
+      if (res.statusCode != 200) {
+        throw Exception("Failed: ${res.statusCode} - ${res.body}");
+      }
+
+      final decoded = jsonDecode(res.body);
+
+      setState(() {
+        upsResult = decoded.toString();
+      });
+    } catch (e) {
+      setState(() {
+        upsResult = "UPS error: $e";
+      });
+    } finally {
+      setState(() {
+        upsLoading = false;
+      });
+    }
+  }
+
+  Future<void> trackFedEx() async {
+    final trackingNumber = fedexController.text.trim();
+
+    if (trackingNumber.isEmpty) {
+      setState(() {
+        fedexResult = "Please enter a FedEx tracking number.";
+      });
+      return;
+    }
+
+    setState(() {
+      fedexLoading = true;
+      fedexResult = null;
+    });
+
+    try {
+      final res = await http.post(
+        Uri.parse('http://localhost:8080/api/tracking'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'carrier': 'fedex',
+          'trackingNumber': trackingNumber,
+        }),
+      );
+
+      if (res.statusCode != 200) {
+        throw Exception("Failed: ${res.statusCode} - ${res.body}");
+      }
+
+      final decoded = jsonDecode(res.body);
+
+      setState(() {
+        fedexResult = decoded.toString();
+      });
+    } catch (e) {
+      setState(() {
+        fedexResult = "FedEx error: $e";
+      });
+    } finally {
+      setState(() {
+        fedexLoading = false;
+      });
+    }
+  }
+
+  Future<void> trackAmazon() async {
+    final packageNumber = amazonController.text.trim();
+
+    if (packageNumber.isEmpty) {
+      setState(() {
+        amazonResult = "Please enter an Amazon package number.";
+      });
+      return;
+    }
+
+    setState(() {
+      amazonLoading = true;
+      amazonResult = null;
+    });
+
+    try {
+      final res = await http.post(
+        Uri.parse('http://localhost:8080/api/tracking'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'carrier': 'amazon',
+          'trackingNumber': packageNumber,
+        }),
+      );
+
+      if (res.statusCode != 200) {
+        throw Exception("Failed: ${res.statusCode} - ${res.body}");
+      }
+
+      final decoded = jsonDecode(res.body);
+
+      setState(() {
+        amazonResult = decoded.toString();
+      });
+    } catch (e) {
+      setState(() {
+        amazonResult = "Amazon error: $e";
+      });
+    } finally {
+      setState(() {
+        amazonLoading = false;
+      });
+    }
+  }
+
+  Widget trackingCard({
+    required String title,
+    required IconData icon,
+    required TextEditingController controller,
+    required bool loading,
+    required String? result,
+    required VoidCallback onTrack,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: Colors.blue),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: "$title Tracking Number",
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: loading ? null : onTrack,
+                icon: const Icon(Icons.search),
+                label: Text(loading ? "Tracking..." : "Track $title"),
+              ),
+            ),
+            if (result != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  result,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    upsController.dispose();
+    fedexController.dispose();
+    amazonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          "Track Your Packages",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Enter a tracking number under the correct carrier.",
+          style: TextStyle(color: Colors.grey),
+        ),
+        const SizedBox(height: 16),
+        trackingCard(
+          title: "UPS",
+          icon: Icons.local_shipping,
+          controller: upsController,
+          loading: upsLoading,
+          result: upsResult,
+          onTrack: trackUps,
+        ),
+        trackingCard(
+          title: "FedEx",
+          icon: Icons.inventory_2,
+          controller: fedexController,
+          loading: fedexLoading,
+          result: fedexResult,
+          onTrack: trackFedEx,
+        ),
+        trackingCard(
+          title: "Amazon",
+          icon: Icons.shopping_cart,
+          controller: amazonController,
+          loading: amazonLoading,
+          result: amazonResult,
+          onTrack: trackAmazon,
+        ),
+      ],
+    );
+  }
+}
+
 /* ---------------- LOCK ---------------- */
 
 class LockScreen extends StatefulWidget {
@@ -473,21 +694,18 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   bool locked = true;
-  Timer? relockTimer; //
+  Timer? relockTimer;
 
   void toggleLock() {
     if (locked) {
-      // Unlock action
       setState(() {
         locked = false;
       });
 
       widget.onUnlocked();
 
-      // Cancel any existing timer just in case
       relockTimer?.cancel();
 
-      // Start 10 second auto-lock timer
       relockTimer = Timer(const Duration(seconds: 10), () {
         if (mounted) {
           setState(() {
@@ -500,7 +718,7 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   void dispose() {
-    relockTimer?.cancel(); // 👈 CLEANUP
+    relockTimer?.cancel();
     super.dispose();
   }
 
@@ -531,10 +749,10 @@ class _LockScreenState extends State<LockScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: locked ? toggleLock : null, // 👈 disables button when unlocked
+                  onPressed: locked ? toggleLock : null,
                   child: Text(locked ? "Unlock" : "Waiting..."),
                 ),
-              )
+              ),
             ],
           ),
         ),

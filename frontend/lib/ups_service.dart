@@ -36,10 +36,28 @@ class UpsService {
       body: {'grant_type': 'client_credentials'},
     );
 
-    final data = jsonDecode(res.body);
+    final body = res.body;
+    final data = jsonDecode(body);
+
+    // 🔴 If UPS returns an error, show it clearly
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('UPS token failed: ${res.statusCode} $body');
+    }
+
+    // 🔴 Validate required fields
+    if (data['access_token'] == null) {
+      throw Exception('UPS token missing access_token: $body');
+    }
+
+    // 🔴 Safely parse expires_in (handles int OR string OR missing)
+    int expiresIn = 3600; // default fallback
+
+    if (data['expires_in'] != null) {
+      expiresIn = int.tryParse(data['expires_in'].toString()) ?? 3600;
+    }
+
     _token = data['access_token'];
-    _expiry =
-        DateTime.now().add(Duration(seconds: data['expires_in'] - 60));
+    _expiry = DateTime.now().add(Duration(seconds: expiresIn - 60));
 
     return _token!;
   }
@@ -56,10 +74,16 @@ class UpsService {
       },
     );
 
+    final body = res.body;
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('UPS tracking failed: ${res.statusCode} $body');
+    }
+
     return {
       'carrier': 'UPS',
       'trackingNumber': trackingNumber,
-      'raw': jsonDecode(res.body),
+      'raw': jsonDecode(body),
     };
   }
 }
