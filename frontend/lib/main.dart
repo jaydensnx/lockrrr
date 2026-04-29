@@ -1,13 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import 'ups_service.dart';
-import 'fedex_service.dart';
-import 'amazon_service.dart';
-
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-
 void main() => runApp(const DeliveryBoxApp());
 
 class DeliveryBoxApp extends StatelessWidget {
@@ -408,24 +401,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
   bool fedexLoading = false;
   bool amazonLoading = false;
 
-  final upsService = UpsService(
-    clientId: 'YOUR_UPS_CLIENT_ID',
-    clientSecret: 'YOUR_UPS_CLIENT_SECRET',
-    accountNumber: 'YOUR_UPS_ACCOUNT_NUMBER',
-    baseUrl: 'https://wwwcie.ups.com',
-  );
-
-  final fedexService = FedExService(
-    clientId: 'YOUR_FEDEX_CLIENT_ID',
-    clientSecret: 'YOUR_FEDEX_CLIENT_SECRET',
-    baseUrl: 'https://apis-sandbox.fedex.com',
-  );
-
-  final amazonService = AmazonService(
-    accessToken: 'YOUR_AMAZON_ACCESS_TOKEN',
-    baseUrl: 'YOUR_AMAZON_BASE_URL',
-  );
-
   Future<void> trackUps() async {
     final trackingNumber = upsController.text.trim();
 
@@ -441,38 +416,23 @@ class _TrackingScreenState extends State<TrackingScreen> {
       upsResult = null;
     });
 
-    try {
-      final res = await http.post(
-        Uri.parse('http://localhost:8080/api/tracking'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'carrier': 'ups',
-          'trackingNumber': trackingNumber,
-        }),
-      );
+    await Future.delayed(const Duration(seconds: 1));
 
-      if (res.statusCode != 200) {
-        throw Exception("Failed: ${res.statusCode} - ${res.body}");
-      }
-
-      final decoded = jsonDecode(res.body);
-
-      setState(() {
-        upsResult = decoded.toString();
-      });
-    } catch (e) {
-      setState(() {
-        upsResult = "UPS error: $e";
-      });
-    } finally {
-      setState(() {
-        upsLoading = false;
-      });
-    }
+    setState(() {
+      upsResult =
+          "Carrier: UPS\n"
+          "Tracking Number: $trackingNumber\n"
+          "Status: Out for Delivery\n"
+          "Location: Harrisonburg, VA\n"
+          "Estimated Delivery: Today 2–6 PM\n"
+          "Description: Package is out for delivery.";
+      upsLoading = false;
+    });
   }
+    
 
   Future<void> trackFedEx() async {
-    final trackingNumber = fedexController.text.trim();
+  final trackingNumber = fedexController.text.trim();
 
     if (trackingNumber.isEmpty) {
       setState(() {
@@ -486,35 +446,19 @@ class _TrackingScreenState extends State<TrackingScreen> {
       fedexResult = null;
     });
 
-    try {
-      final res = await http.post(
-        Uri.parse('http://localhost:8080/api/tracking'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'carrier': 'fedex',
-          'trackingNumber': trackingNumber,
-        }),
-      );
+  await Future.delayed(const Duration(seconds: 1));
 
-      if (res.statusCode != 200) {
-        throw Exception("Failed: ${res.statusCode} - ${res.body}");
-      }
-
-      final decoded = jsonDecode(res.body);
-
-      setState(() {
-        fedexResult = decoded.toString();
-      });
-    } catch (e) {
-      setState(() {
-        fedexResult = "FedEx error: $e";
-      });
-    } finally {
-      setState(() {
-        fedexLoading = false;
-      });
-    }
-  }
+  setState(() {
+    fedexResult =
+        "Carrier: FedEx\n"
+        "Tracking Number: $trackingNumber\n"
+        "Status: In Transit\n"
+        "Location: Richmond, VA\n"
+        "Estimated Delivery: Tomorrow\n"
+        "Description: Package is moving through the network.";
+    fedexLoading = false;
+  });
+}
 
   Future<void> trackAmazon() async {
     final packageNumber = amazonController.text.trim();
@@ -531,34 +475,18 @@ class _TrackingScreenState extends State<TrackingScreen> {
       amazonResult = null;
     });
 
-    try {
-      final res = await http.post(
-        Uri.parse('http://localhost:8080/api/tracking'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'carrier': 'amazon',
-          'trackingNumber': packageNumber,
-        }),
-      );
+    await Future.delayed(const Duration(seconds: 1));
 
-      if (res.statusCode != 200) {
-        throw Exception("Failed: ${res.statusCode} - ${res.body}");
-      }
-
-      final decoded = jsonDecode(res.body);
-
-      setState(() {
-        amazonResult = decoded.toString();
-      });
-    } catch (e) {
-      setState(() {
-        amazonResult = "Amazon error: $e";
-      });
-    } finally {
-      setState(() {
-        amazonLoading = false;
-      });
-    }
+    setState(() {
+      amazonResult =
+          "Carrier: Amazon\n"
+          "Package Number: $packageNumber\n"
+          "Status: Arriving Today\n"
+          "Location: Local Delivery Station\n"
+          "Estimated Delivery: By 10 PM\n"
+          "Description: Package is nearby and out for delivery.";
+      amazonLoading = false;
+    });
   }
 
   Widget trackingCard({
