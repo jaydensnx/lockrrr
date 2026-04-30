@@ -192,6 +192,22 @@ class _AppShellState extends State<AppShell> {
 
   final List<UnlockNotification> notifications = [];
 
+  /* ---------------- ITEM IN BOX STATUS ---------------- */
+
+  // This keeps track of whether the box currently has an item inside.
+  // For now, this can be changed manually for testing.
+  // Later, this should be updated by the real sensor, backend API, or MQTT message.
+  bool itemInBox = false;
+
+  // This function updates the item status.
+  // Use true when an item is detected.
+  // Use false when no item is detected.
+  void updateItemStatus(bool hasItem) {
+    setState(() {
+      itemInBox = hasItem;
+    });
+  }
+
   void addUnlockNotification() {
     setState(() {
       notifications.insert(
@@ -216,7 +232,11 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      DashboardScreen(notifications: notifications),
+      DashboardScreen(
+        notifications: notifications,
+        itemInBox: itemInBox,
+        onItemStatusChanged: updateItemStatus,
+      ),
       const TrackingScreen(),
       LockScreen(onUnlocked: addUnlockNotification),
     ];
@@ -287,9 +307,20 @@ class _AppShellState extends State<AppShell> {
 class DashboardScreen extends StatelessWidget {
   final List<UnlockNotification> notifications;
 
+  // Shows whether an item is currently inside the box.
+  // This value comes from AppShell so it can later be connected
+  // to the real sensor/API/MQTT pull.
+  final bool itemInBox;
+
+  // Temporary testing function.
+  // Later, the real sensor/backend should call this instead.
+  final Function(bool) onItemStatusChanged;
+
   const DashboardScreen({
     super.key,
     required this.notifications,
+    required this.itemInBox,
+    required this.onItemStatusChanged,
   });
 
   @override
@@ -311,6 +342,35 @@ class DashboardScreen extends StatelessWidget {
             ),
             subtitle: Text(
               "Open the Tracking page from the menu to track UPS, FedEx, or Amazon packages.",
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        /* ---------------- ITEM IN BOX CARD ---------------- */
+
+        // This card shows whether there is currently an item inside the box.
+        // Right now, the status is controlled with a temporary test button.
+        // Later, this same itemInBox value can be updated by the actual sensor,
+        // backend API, or MQTT message.
+        Card(
+          child: ListTile(
+            leading: Icon(
+              itemInBox ? Icons.inventory_2 : Icons.inventory_2_outlined,
+              color: itemInBox ? Colors.green : Colors.grey,
+            ),
+            title: const Text(
+              "Item in Box",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              itemInBox ? "Item detected inside the box." : "No item detected.",
+            ),
+            trailing: ElevatedButton(
+              onPressed: () {
+                onItemStatusChanged(!itemInBox);
+              },
+              child: Text(itemInBox ? "Remove" : "Add"),
             ),
           ),
         ),
