@@ -1,5 +1,35 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+const String apiBaseUrl = 'https://lockrrr.site/api';
+
+Future<Map<String, dynamic>> fetchBoxState() async {
+  final res = await http.get(
+    Uri.parse('$apiBaseUrl/box-state'),
+  );
+
+  return jsonDecode(res.body);
+}
+
+Future<List<dynamic>> fetchBoxAlerts() async {
+  final res = await http.get(
+    Uri.parse('$apiBaseUrl/alerts'),
+  );
+
+  return jsonDecode(res.body);
+}
+
+Future<void> unlockBox() async {
+  final res = await http.post(
+    Uri.parse('$apiBaseUrl/unlock'),
+  );
+
+  if (res.statusCode != 200) {
+    throw Exception('Failed to unlock box');
+  }
+}
 
 void main() => runApp(const DeliveryBoxApp());
 
@@ -164,17 +194,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/* ---------------- DATA MODEL ---------------- */
-
-class UnlockNotification {
-  final String title;
-  final DateTime timestamp;
-
-  UnlockNotification({
-    required this.title,
-    required this.timestamp,
-  });
-}
 
 /* ---------------- APP SHELL ---------------- */
 
@@ -190,7 +209,24 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int index = 0;
 
-  final List<UnlockNotification> notifications = [];
+  List<dynamic> alerts = [];
+  bool locked = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadBoxData();
+  }
+
+  Future<void> loadBoxData() async {
+    final boxState = await fetchBoxState();
+    final alertData = await fetchBoxAlerts();
+
+    setState(() {
+      locked = boxState['is_locked'] == true;
+      alerts = alertData;
+    });
+  }
 
   /* ---------------- ITEM IN BOX STATUS ---------------- */
 
@@ -208,22 +244,6 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  void addUnlockNotification() {
-    setState(() {
-      notifications.insert(
-        0,
-        UnlockNotification(
-          title: "Box Unlocked",
-          timestamp: DateTime.now(),
-        ),
-      );
-
-      if (notifications.length > 4) {
-        notifications.removeLast();
-      }
-    });
-  }
-
   void goTo(int i) {
     setState(() => index = i);
     Navigator.of(context).pop();
@@ -233,12 +253,12 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final screens = [
       DashboardScreen(
-        notifications: notifications,
+        alerts: alerts,
         itemInBox: itemInBox,
         onItemStatusChanged: updateItemStatus,
       ),
       const TrackingScreen(),
-      LockScreen(onUnlocked: addUnlockNotification),
+      const LockScreen(),
     ];
 
     return Scaffold(
@@ -305,7 +325,7 @@ class _AppShellState extends State<AppShell> {
 /* ---------------- DASHBOARD ---------------- */
 
 class DashboardScreen extends StatelessWidget {
-  final List<UnlockNotification> notifications;
+  final List<dynamic> alerts;
 
   // Shows whether an item is currently inside the box.
   // This value comes from AppShell so it can later be connected
@@ -318,7 +338,7 @@ class DashboardScreen extends StatelessWidget {
 
   const DashboardScreen({
     super.key,
-    required this.notifications,
+    required this.alerts,
     required this.itemInBox,
     required this.onItemStatusChanged,
   });
@@ -353,58 +373,35 @@ class DashboardScreen extends StatelessWidget {
         // Right now, the status is controlled with a temporary test button.
         // Later, this same itemInBox value can be updated by the actual sensor,
         // backend API, or MQTT message.
-        Card(
-          child: ListTile(
-            leading: Icon(
-              itemInBox ? Icons.inventory_2 : Icons.inventory_2_outlined,
-              color: itemInBox ? Colors.green : Colors.grey,
-            ),
-            title: const Text(
-              "Item in Box",
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              itemInBox ? "Item detected inside the box." : "No item detected.",
-            ),
-            trailing: ElevatedButton(
-              onPressed: () {
-                onItemStatusChanged(!itemInBox);
-              },
-              child: Text(itemInBox ? "Remove" : "Add"),
-            ),
-          ),
-        ),
         const SizedBox(height: 24),
         const Text(
           "Notifications",
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        if (notifications.isEmpty)
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.notifications_none),
-              title: Text("No notifications yet"),
-              subtitle: Text("Unlock the box to see notifications here."),
+      if (alerts.isEmpty)
+        const Card(
+          child: ListTile(
+            leading: Icon(Icons.notifications_none),
+            title: Text("No notifications yet"),
+          ),
+        )
+      else
+        Card(
+          child: ListTile(
+            leading: const Icon(
+              Icons.notifications_active,
+              color: Colors.blue,
             ),
-          )
-        else
-          ...notifications.map(
-            (note) => Card(
-              child: ListTile(
-                leading: const Icon(
-                  Icons.notifications_active,
-                  color: Colors.blue,
-                ),
-                title: Text(
-                  note.title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(formatDateTime(note.timestamp)),
-                trailing: const Icon(Icons.lock_open, color: Colors.green),
-              ),
+            title: Text(
+              alerts.first['message'] ?? 'Alert',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              alerts.first['timestamp'] ?? '',
             ),
           ),
+        ),
       ],
     );
   }
@@ -669,12 +666,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 /* ---------------- LOCK ---------------- */
 
 class LockScreen extends StatefulWidget {
-  final VoidCallback onUnlocked;
-
-  const LockScreen({
-    super.key,
-    required this.onUnlocked,
-  });
+  const LockScreen({super.key});
 
   @override
   State<LockScreen> createState() => _LockScreenState();
@@ -682,32 +674,33 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   bool locked = true;
-  Timer? relockTimer;
-
-  void toggleLock() {
-    if (locked) {
-      setState(() {
-        locked = false;
-      });
-
-      widget.onUnlocked();
-
-      relockTimer?.cancel();
-
-      relockTimer = Timer(const Duration(seconds: 10), () {
-        if (mounted) {
-          setState(() {
-            locked = true;
-          });
-        }
-      });
-    }
-  }
+  bool loading = false;
 
   @override
-  void dispose() {
-    relockTimer?.cancel();
-    super.dispose();
+  void initState() {
+    super.initState();
+    refreshLockState();
+  }
+
+  Future<void> refreshLockState() async {
+    final boxState = await fetchBoxState();
+
+    setState(() {
+      locked = boxState['is_locked'] == true;
+    });
+  }
+
+  Future<void> handleUnlock() async {
+    setState(() {
+      loading = true;
+    });
+
+    await unlockBox();
+    await refreshLockState();
+
+    setState(() {
+      loading = false;
+    });
   }
 
   @override
@@ -723,7 +716,7 @@ class _LockScreenState extends State<LockScreen> {
               Icon(
                 locked ? Icons.lock : Icons.lock_open,
                 size: 70,
-                color: Colors.green,
+                color: locked ? Colors.green : Colors.red,
               ),
               const SizedBox(height: 12),
               Text(
@@ -737,8 +730,16 @@ class _LockScreenState extends State<LockScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: locked ? toggleLock : null,
-                  child: Text(locked ? "Unlock" : "Waiting..."),
+                  onPressed: locked && !loading
+                      ? handleUnlock
+                      : refreshLockState,
+                  child: Text(
+                    loading
+                        ? "Unlocking..."
+                        : locked
+                            ? "Unlock Box"
+                            : "Check Lock Status",
+                  ),
                 ),
               ),
             ],
