@@ -1,6 +1,5 @@
-
 require('dotenv').config();
-
+console.log("🔥 THIS IS THE NEW SERVER FILE");
 /* =========================
    IMPORTS
 ========================= */
@@ -22,6 +21,7 @@ app.use(cors());
 const DEVICE_ID = "esp32_lockrrr_01";
 const COMMAND_TOPIC = `lockrrr/${DEVICE_ID}/command`;
 const STATUS_TOPIC = `lockrrr/${DEVICE_ID}/status`;
+const PACKAGE_TOPIC = `lockrrr/${DEVICE_ID}/package`;
 const BOX_ID = 1;
 
 /* =========================
@@ -43,13 +43,18 @@ const mqttClient = mqtt.connect('mqtt://127.0.0.1:1883');
 mqttClient.on('connect', () => {
     console.log("✅ MQTT connected");
 
-    mqttClient.subscribe(STATUS_TOPIC, (err) => {
-        if (err) {
-            console.error("❌ Subscribe failed:", err);
-        } else {
-            console.log("📡 Subscribed to", STATUS_TOPIC);
+    mqttClient.subscribe(
+        [STATUS_TOPIC, PACKAGE_TOPIC],
+        (err) => {
+                if (err) {
+                console.error("❌ Subscribe failed:", err);
+                } else {
+                console.log("📡 Subscribed to:");
+                console.log("   ", STATUS_TOPIC);
+                console.log("   ", PACKAGE_TOPIC);
+                }
         }
-    });
+     );
 });
 
 mqttClient.on('error', (err) => {
@@ -57,7 +62,7 @@ mqttClient.on('error', (err) => {
 });
 
 mqttClient.on('offline', () => {
-    console.log("⚠️ MQTT offline");
+    console.log("⚠️ MQTT offline")
 });
 
 mqttClient.on('reconnect', () => {
@@ -68,6 +73,24 @@ mqttClient.on('reconnect', () => {
    HANDLE ESP32 STATUS
 ========================= */
 mqttClient.on('message', async (topic, message) => {
+if (topic === PACKAGE_TOPIC) {
+
+    const data = JSON.parse(message.toString());
+
+    console.log("📦 PACKAGE RECEIVED:", data);
+
+    await db.query(
+        `UPDATE box_state
+         SET has_package = true,
+             last_updated = NOW()
+         WHERE box_id = $1`,
+        [1]
+    );
+
+    console.log("✅ box_state updated");
+
+    return;
+}
     try {
         const data = JSON.parse(message.toString());
         console.log("📩 STATUS RECEIVED:", data);
@@ -110,7 +133,7 @@ mqttClient.on('message', async (topic, message) => {
             const is_locked = event_type === "lock";
 
             await db.query(
-                `UPDATE box_state 
+                `UPDATE box_state
                  SET is_locked = $1, last_updated = NOW()
                  WHERE box_id = $2`,
                 [is_locked, BOX_ID]
@@ -122,7 +145,7 @@ mqttClient.on('message', async (topic, message) => {
             const has_package = value > 0.2; // threshold to avoid noise
 
             await db.query(
-                `UPDATE box_state 
+                `UPDATE box_state
                  SET has_package = $1, last_updated = NOW()
                  WHERE box_id = $2`,
                 [has_package, BOX_ID]
@@ -232,6 +255,11 @@ app.get("/api/box-state", async (req, res) => {
     }
 });
 
+
+//test
+app.get("/test", (req, res) => {
+    res.send("TEST WORKS");
+});
 /* =========================
    START SERVER
 ========================= */
