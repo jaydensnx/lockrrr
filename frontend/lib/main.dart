@@ -1,35 +1,7 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
-const String apiBaseUrl = 'https://lockrrr.site/api';
-
-Future<Map<String, dynamic>> fetchBoxState() async {
-  final res = await http.get(
-    Uri.parse('$apiBaseUrl/box-state'),
-  );
-
-  return jsonDecode(res.body);
-}
-
-Future<List<dynamic>> fetchBoxAlerts() async {
-  final res = await http.get(
-    Uri.parse('$apiBaseUrl/alerts'),
-  );
-
-  return jsonDecode(res.body);
-}
-
-Future<void> unlockBox() async {
-  final res = await http.post(
-    Uri.parse('$apiBaseUrl/unlock'),
-  );
-
-  if (res.statusCode != 200) {
-    throw Exception('Failed to unlock box');
-  }
-}
 
 void main() => runApp(const DeliveryBoxApp());
 
@@ -194,6 +166,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+/* ---------------- DATA MODEL ---------------- */
+
+class UnlockNotification {
+  final String title;
+  final DateTime timestamp;
+
+  UnlockNotification({
+    required this.title,
+    required this.timestamp,
+  });
+}
 
 /* ---------------- APP SHELL ---------------- */
 
@@ -209,38 +192,91 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int index = 0;
 
-  List<dynamic> alerts = [];
-  bool locked = true;
-
-  @override
-  void initState() {
-    super.initState();
-    loadBoxData();
-  }
-
-  Future<void> loadBoxData() async {
-    final boxState = await fetchBoxState();
-    final alertData = await fetchBoxAlerts();
-
-    setState(() {
-      locked = boxState['is_locked'] == true;
-      alerts = alertData;
-    });
-  }
+  final List<UnlockNotification> notifications = [];
 
   /* ---------------- ITEM IN BOX STATUS ---------------- */
 
-  // This keeps track of whether the box currently has an item inside.
-  // For now, this can be changed manually for testing.
-  // Later, this should be updated by the real sensor, backend API, or MQTT message.
+  // Now driven by has_package from GET /api/box-state via polling.
+  // Updated automatically every 5 seconds — no manual button needed.
   bool itemInBox = false;
 
-  // This function updates the item status.
-  // Use true when an item is detected.
-  // Use false when no item is detected.
-  void updateItemStatus(bool hasItem) {
+  /* ---------------- FETCH ALERTS FROM SERVER ---------------- */
+
+  // Fetches alerts from GET http://lockrrr.site/api/alerts
+  // Replaces the notifications list with the latest 4 from the server
+  // to avoid duplicates on repeated fetches.
+  Future<void> fetchAlerts() async {
+    try {
+      final res = await http.get(
+        Uri.parse("http://lockrrr.site/api/alerts"),
+      );
+
+      if (res.statusCode == 200) {
+        final dynamic decoded = jsonDecode(res.body);
+
+        if (decoded is! List) return;
+
+        final List<dynamic> alerts = decoded;
+
+        final List<UnlockNotification> fetched = [];
+
+        for (final a in alerts) {
+          if (a is! Map) continue;
+
+          final String title =
+              (a['message'] as String? ?? '').isNotEmpty
+                  ? a['message'] as String
+                  : 'Box Unlocked';
+
+          DateTime timestamp;
+          try {
+            timestamp = DateTime.parse(a['timestamp'] as String? ?? '');
+          } catch (_) {
+            timestamp = DateTime.now();
+          }
+
+          fetched.add(UnlockNotification(title: title, timestamp: timestamp));
+
+          // Only keep the 4 most recent
+          if (fetched.length >= 4) break;
+        }
+
+        setState(() {
+          // Replace list entirely to avoid duplicates
+          notifications
+            ..clear()
+            ..addAll(fetched);
+        });
+      }
+    } catch (_) {
+      // Silently ignore network errors — dashboard shows whatever is cached
+    }
+  }
+
+  void addUnlockNotification() {
     setState(() {
-      itemInBox = hasItem;
+      notifications.insert(
+        0,
+        UnlockNotification(
+          title: "Box Unlocked",
+          timestamp: DateTime.now(),
+        ),
+      );
+
+      if (notifications.length > 4) {
+        notifications.removeLast();
+      }
+    });
+
+    // Refresh alerts from server after an unlock
+    fetchAlerts();
+  }
+
+  // Called by LockScreen's poll whenever box-state is refreshed.
+  // Updates both lock-adjacent UI and the has_package indicator.
+  void onBoxStateUpdated({required bool hasPackage}) {
+    setState(() {
+      itemInBox = hasPackage;
     });
   }
 
@@ -250,15 +286,24 @@ class _AppShellState extends State<AppShell> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Load alerts when the app shell first opens
+    fetchAlerts();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final screens = [
       DashboardScreen(
-        alerts: alerts,
+        notifications: notifications,
         itemInBox: itemInBox,
-        onItemStatusChanged: updateItemStatus,
       ),
       const TrackingScreen(),
-      const LockScreen(),
+      LockScreen(
+        onUnlocked: addUnlockNotification,
+        onBoxStateUpdated: onBoxStateUpdated,
+      ),
     ];
 
     return Scaffold(
@@ -325,22 +370,15 @@ class _AppShellState extends State<AppShell> {
 /* ---------------- DASHBOARD ---------------- */
 
 class DashboardScreen extends StatelessWidget {
-  final List<dynamic> alerts;
+  final List<UnlockNotification> notifications;
 
-  // Shows whether an item is currently inside the box.
-  // This value comes from AppShell so it can later be connected
-  // to the real sensor/API/MQTT pull.
+  // Now driven by has_package from the API — no manual callback needed.
   final bool itemInBox;
-
-  // Temporary testing function.
-  // Later, the real sensor/backend should call this instead.
-  final Function(bool) onItemStatusChanged;
 
   const DashboardScreen({
     super.key,
-    required this.alerts,
+    required this.notifications,
     required this.itemInBox,
-    required this.onItemStatusChanged,
   });
 
   @override
@@ -369,39 +407,58 @@ class DashboardScreen extends StatelessWidget {
 
         /* ---------------- ITEM IN BOX CARD ---------------- */
 
-        // This card shows whether there is currently an item inside the box.
-        // Right now, the status is controlled with a temporary test button.
-        // Later, this same itemInBox value can be updated by the actual sensor,
-        // backend API, or MQTT message.
+        // has_package from /api/box-state drives this card automatically.
+        // The manual Add/Remove button has been removed — the ESP32/MQTT
+        // updates the server, the app polls it every 5 seconds.
+        Card(
+          color: itemInBox ? Colors.green.shade50 : null,
+          child: ListTile(
+            leading: Icon(
+              itemInBox ? Icons.inventory_2 : Icons.inventory_2_outlined,
+              color: itemInBox ? Colors.green : Colors.grey,
+            ),
+            title: const Text(
+              "Item in Box",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              itemInBox
+                  ? "📦 A package has been detected."
+                  : "No package detected.",
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
         const Text(
           "Notifications",
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-      if (alerts.isEmpty)
-        const Card(
-          child: ListTile(
-            leading: Icon(Icons.notifications_none),
-            title: Text("No notifications yet"),
+        if (notifications.isEmpty)
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.notifications_none),
+              title: Text("No notifications yet"),
+              subtitle: Text("Unlock the box to see notifications here."),
+            ),
+          )
+        else
+          ...notifications.map(
+            (note) => Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.notifications_active,
+                  color: Colors.blue,
+                ),
+                title: Text(
+                  note.title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(formatDateTime(note.timestamp)),
+                trailing: const Icon(Icons.lock_open, color: Colors.green),
+              ),
+            ),
           ),
-        )
-      else
-        Card(
-          child: ListTile(
-            leading: const Icon(
-              Icons.notifications_active,
-              color: Colors.blue,
-            ),
-            title: Text(
-              alerts.first['message'] ?? 'Alert',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              alerts.first['timestamp'] ?? '',
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -432,6 +489,8 @@ class DashboardScreen extends StatelessWidget {
       "November",
       "December",
     ];
+    // Guard against out-of-range month values from corrupted API data
+    if (month < 1 || month > 12) return "Unknown";
     return months[month - 1];
   }
 }
@@ -486,10 +545,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
       upsLoading = false;
     });
   }
-    
 
   Future<void> trackFedEx() async {
-  final trackingNumber = fedexController.text.trim();
+    final trackingNumber = fedexController.text.trim();
 
     if (trackingNumber.isEmpty) {
       setState(() {
@@ -503,19 +561,19 @@ class _TrackingScreenState extends State<TrackingScreen> {
       fedexResult = null;
     });
 
-  await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(const Duration(seconds: 1));
 
-  setState(() {
-    fedexResult =
-        "Carrier: FedEx\n"
-        "Tracking Number: $trackingNumber\n"
-        "Status: In Transit\n"
-        "Location: Richmond, VA\n"
-        "Estimated Delivery: Tomorrow\n"
-        "Description: Package is moving through the network.";
-    fedexLoading = false;
-  });
-}
+    setState(() {
+      fedexResult =
+          "Carrier: FedEx\n"
+          "Tracking Number: $trackingNumber\n"
+          "Status: In Transit\n"
+          "Location: Richmond, VA\n"
+          "Estimated Delivery: Tomorrow\n"
+          "Description: Package is moving through the network.";
+      fedexLoading = false;
+    });
+  }
 
   Future<void> trackAmazon() async {
     final packageNumber = amazonController.text.trim();
@@ -666,7 +724,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
 /* ---------------- LOCK ---------------- */
 
 class LockScreen extends StatefulWidget {
-  const LockScreen({super.key});
+  final VoidCallback onUnlocked;
+
+  // Called every poll cycle with the latest has_package value
+  // so AppShell can update the Dashboard without extra API calls.
+  final void Function({required bool hasPackage}) onBoxStateUpdated;
+
+  const LockScreen({
+    super.key,
+    required this.onUnlocked,
+    required this.onBoxStateUpdated,
+  });
 
   @override
   State<LockScreen> createState() => _LockScreenState();
@@ -674,33 +742,105 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen> {
   bool locked = true;
-  bool loading = false;
+  bool isLoading = false;
+  String? errorMessage;
+  Timer? pollTimer;
+
+  /* ---------------- POLL BOX STATE FROM SERVER ---------------- */
+
+  // Polls GET http://lockrrr.site:3000/api/box-state every 5 seconds.
+  // Reads both is_locked and has_package from the response.
+  Future<void> fetchLockState() async {
+    try {
+      final response = await http.get(
+        Uri.parse("https://lockrrr.site/api/box-state"),
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic data = jsonDecode(response.body);
+        if (data is Map) {
+          final bool serverLocked = data['is_locked'] as bool? ?? true;
+          final bool hasPackage = data['has_package'] as bool? ?? false;
+
+          if (mounted) {
+            setState(() {
+              locked = serverLocked;
+            });
+            // Pass has_package up to AppShell to update the Dashboard card
+            widget.onBoxStateUpdated(hasPackage: hasPackage);
+          }
+        }
+      }
+    } catch (_) {
+      // Silently ignore poll errors — UI keeps last known state
+    }
+  }
+
+  /* ---------------- SEND UNLOCK TO SERVER ---------------- */
+
+  // Posts to POST http://lockrrr.site:3000/api/unlock
+  Future<void> toggleLock() async {
+    if (!locked || isLoading) return;
+
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse("https://lockrrr.site/api/unlock"),
+         headers: {
+          "x-api-key": "ayeyoulockingthatbadboyup67",
+        },
+      );
+
+      if (response.statusCode == 200) {
+        pollTimer?.cancel();
+        setState(() {
+          locked = false;
+          isLoading = false;
+        });
+        widget.onUnlocked();
+        // Restart polling so re-lock is detected from the server
+        _startPolling();
+      } else {
+        setState(() {
+          isLoading = false;
+          errorMessage =
+              "Unlock failed (server error ${response.statusCode}). Please try again.";
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage =
+              "Could not reach the server. Check your connection and try again.";
+        });
+      }
+    }
+  }
+
+  void _startPolling() {
+    pollTimer?.cancel();
+    pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      fetchLockState();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    refreshLockState();
+    // Fetch state immediately on screen open, then poll every 5 seconds
+    fetchLockState();
+    _startPolling();
   }
 
-  Future<void> refreshLockState() async {
-    final boxState = await fetchBoxState();
-
-    setState(() {
-      locked = boxState['is_locked'] == true;
-    });
-  }
-
-  Future<void> handleUnlock() async {
-    setState(() {
-      loading = true;
-    });
-
-    await unlockBox();
-    await refreshLockState();
-
-    setState(() {
-      loading = false;
-    });
+  @override
+  void dispose() {
+    pollTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -716,7 +856,7 @@ class _LockScreenState extends State<LockScreen> {
               Icon(
                 locked ? Icons.lock : Icons.lock_open,
                 size: 70,
-                color: locked ? Colors.green : Colors.red,
+                color: locked ? Colors.green : Colors.orange,
               ),
               const SizedBox(height: 12),
               Text(
@@ -726,19 +866,25 @@ class _LockScreenState extends State<LockScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              if (errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  errorMessage!,
+                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: locked && !loading
-                      ? handleUnlock
-                      : refreshLockState,
+                  onPressed: (locked && !isLoading) ? toggleLock : null,
                   child: Text(
-                    loading
+                    isLoading
                         ? "Unlocking..."
                         : locked
-                            ? "Unlock Box"
-                            : "Check Lock Status",
+                            ? "Unlock"
+                            : "Waiting...",
                   ),
                 ),
               ),
